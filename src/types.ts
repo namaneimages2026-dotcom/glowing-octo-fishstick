@@ -1,40 +1,50 @@
-export type Route = "home" | "services" | "products" | "materials" | "quote" | "laser" | "education" | "internships" | "dashboard" | "admin" | "contact";
+export type EntityId = string;
 
-export type Material = {
+export type InventoryItem = {
+  id: EntityId;
+  sku: string;
   name: string;
-  thickness: string;
-  cut: boolean;
-  engrave: boolean;
-  power: [number, number];
-  speed: [number, number];
-  risks: string[];
+  unit: "pcs" | "m" | "sheet" | "kg";
+  onHand: number;
+  reorderPoint: number;
+  updatedAt: string;
 };
 
-export type Job = {
-  title: string;
+export type WorkOrder = {
+  id: EntityId;
+  code: string;
   client: string;
-  material: string;
-  qty: number;
-  deadline: string;
-  budget: [number, number];
-};
-
-export type SimulationResult = {
-  status: string;
-  feedback: string;
-  score: number;
-};
-
-export type QuoteRequest = {
-  id: string;
-  clientName: string;
-  whatsapp: string;
-  service: string;
-  material: string;
-  size: string;
+  itemId: EntityId;
   quantity: number;
-  deadline: string;
-  notes: string;
-  estimate: number;
-  status: "New" | "Quoted" | "Approved" | "In Production" | "Completed";
+  dueDate: string;
+  status: "queued" | "in_progress" | "done";
+  updatedAt: string;
+};
+
+export type ScanEvent = {
+  id: EntityId;
+  itemId: EntityId;
+  delta: number;
+  source: "qr_scan" | "manual";
+  createdAt: string;
+};
+
+export type SyncOperation = {
+  id: EntityId;
+  type: "UPSERT_ITEM" | "UPSERT_ORDER" | "ADD_SCAN";
+  payload: unknown;
+  createdAt: string;
+};
+
+export type Snapshot = {
+  items: InventoryItem[];
+  orders: WorkOrder[];
+  scans: ScanEvent[];
+  queue: SyncOperation[];
+};
+
+export type Connector = {
+  key: string;
+  label: string;
+  send: (ops: SyncOperation[]) => Promise<{ sent: number; remoteRef: string }>;
 };
