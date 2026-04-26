@@ -1,57 +1,202 @@
-import { seedItems, seedOrders } from "../data/materials";
-import { ScanEvent, Snapshot, SyncOperation, WorkOrder, InventoryItem } from "../types";
+import type {
+  InternshipApplication,
+  QuoteRequest,
+  SimulationRun,
+  TrainingStats
+} from "../types";
 
-const STORAGE_KEY = "namane-supply-os.snapshot.v1";
+const STORAGE_KEY = "namane-supply-os-v2";
 
-const now = () => new Date().toISOString();
-const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-
-const initialState: Snapshot = {
-  items: seedItems,
-  orders: seedOrders,
-  scans: [],
-  queue: []
+export type SyncOperation = {
+  id: string;
+  type:
+    | "ADD_QUOTE_REQUEST"
+    | "ADD_INTERNSHIP_APPLICATION"
+    | "ADD_SIMULATION_RUN"
+    | "SAVE_TRAINING";
+  payload: unknown;
+  createdAt: string;
 };
 
-export const readSnapshot = (): Snapshot => {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return initialState;
+export type Snapshot = {
+  quoteRequests: QuoteRequest[];
+  internshipApplications: InternshipApplication[];
+  simulationRuns: SimulationRun[];
+  training: TrainingStats;
+  queue: SyncOperation[];
+};
+
+const now = () => new Date().toISOString();
+
+const uid = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+const defaultTraining: TrainingStats = {
+  completedModules: [],
+  quizScores: {},
+  simulationScore: 0,
+  maintenanceScore: 0,
+  updatedAt: now()
+};
+
+export const createInitialSnapshot = (): Snapshot => ({
+  quoteRequests: [],
+  internshipApplications: [],
+  simulationRuns: [],
+  training: defaultTraining,
+  queue: []
+});
+
+const isSnapshot = (value: unknown): value is Snapshot => {
+  if (!value || typeof value !== "object") return false;
+
+  const candidate = value as Partial<Snapshot>;
+
+  return (
+    Array.isArray(candidate.quoteRequests) &&
+    Array.isArray(candidate.internshipApplications) &&
+    Array.isArray(candidate.simulationRuns) &&
+    typeof candidate.training === "object" &&
+    Array.isArray(candidate.queue)
+  );
+};
+
+export const loadSnapshot = (): Snapshot => {
+  if (typeof window === "undefined") return createInitialSnapshot();
+
   try {
-    return JSON.parse(raw) as Snapshot;
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return createInitialSnapshot();
+
+    const parsed = JSON.parse(raw);
+
+    if (!isSnapshot(parsed)) return createInitialSnapshot();
+
+    return {
+      ...createInitialSnapshot(),
+      ...parsed,
+      training: {
+        ...defaultTraining,
+        ...parsed.training
+      }
+    };
   } catch {
-    return initialState;
+    return createInitialSnapshot();
   }
 };
 
-export const writeSnapshot = (snapshot: Snapshot) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+export const saveSnapshot = (snapshot: Snapshot) => {
+  if (typeof window === "undefined") return;
+
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
 };
 
-export const upsertItem = (snapshot: Snapshot, draft: Omit<InventoryItem, "updatedAt">): Snapshot => {
-  const item: InventoryItem = { ...draft, updatedAt: now() };
-  const next = snapshot.items.some((i) => i.id === item.id)
-    ? snapshot.items.map((i) => (i.id === item.id ? item : i))
-    : [...snapshot.items, item];
-  const op: SyncOperation = { id: uid(), type: "UPSERT_ITEM", payload: item, createdAt: now() };
-  return { ...snapshot, items: next, queue: [...snapshot.queue, op] };
-};
+const appendQueue = (
+  snapshot: Snapshot,
+  type: SyncOperation["type"],
+  payload: unknown
+): Snapshot => ({
+  ...snapshot,
+  queue: [
+    ...snapshot.queue,
+    {
+      id: uid(),
+      type,
+      payload,
+      createdAt: now()
+    }
+  ]
+});
 
-export const upsertOrder = (snapshot: Snapshot, order: Omit<WorkOrder, "updatedAt">): Snapshot => {
-  const record: WorkOrder = { ...order, updatedAt: now() };
-  const next = snapshot.orders.some((o) => o.id === record.id)
-    ? snapshot.orders.map((o) => (o.id === record.id ? record : o))
-    : [...snapshot.orders, record];
-  const op: SyncOperation = { id: uid(), type: "UPSERT_ORDER", payload: record, createdAt: now() };
-  return { ...snapshot, orders: next, queue: [...snapshot.queue, op] };
-};
+export const addQuoteRequest = (
+  snapshot: Snapshot,
+  draft: Omit<QuoteRequest, "id" | "createdAt" | "status">
+): Snapshot => {
+  const entry: QuoteRequest = {
+    ...draft,
+    id: uid(),
+    status: "new",
+    createdAt: now()
+  };
 
-export const applyScan = (snapshot: Snapshot, itemId: string, delta: number, source: ScanEvent["source"]): Snapshot => {
-  const scan: ScanEvent = { id: uid(), itemId, delta, source, createdAt: now() };
-  const items = snapshot.items.map((item) =>
-    item.id === itemId ? { ...item, onHand: Math.max(0, item.onHand + delta), updatedAt: now() } : item
+  return appendQueue(
+    {
+      ...snapshot,
+      quoteRequests: [entry, ...snapshot.quoteRequests]
+    },
+    "ADD_QUOTE_REQUEST",
+    entry
   );
-  const op: SyncOperation = { id: uid(), type: "ADD_SCAN", payload: scan, createdAt: now() };
-  return { ...snapshot, items, scans: [scan, ...snapshot.scans], queue: [...snapshot.queue, op] };
 };
 
-export const clearQueue = (snapshot: Snapshot): Snapshot => ({ ...snapshot, queue: [] });
+export const addInternshipApplication = (
+  snapshot: Snapshot,
+  draft: Omit<InternshipApplication, "id" | "createdAt" | "status">
+): Snapshot => {
+  const entry: InternshipApplication = {
+    ...draft,
+    id: uid(),
+    status: "submitted",
+    createdAt: now()
+  };
+
+  return appendQueue(
+    {
+      ...snapshot,
+      internshipApplications: [entry, ...snapshot.internshipApplications]
+    },
+    "ADD_INTERNSHIP_APPLICATION",
+    entry
+  );
+};
+
+export const addSimulationRun = (
+  snapshot: Snapshot,
+  draft: Omit<SimulationRun, "id" | "createdAt">
+): Snapshot => {
+  const entry: SimulationRun = {
+    ...draft,
+    id: uid(),
+    createdAt: now()
+  };
+
+  return appendQueue(
+    {
+      ...snapshot,
+      simulationRuns: [entry, ...snapshot.simulationRuns]
+    },
+    "ADD_SIMULATION_RUN",
+    entry
+  );
+};
+
+export const saveTraining = (
+  snapshot: Snapshot,
+  stats: TrainingStats
+): Snapshot => {
+  return appendQueue(
+    {
+      ...snapshot,
+      training: {
+        ...stats,
+        updatedAt: now()
+      }
+    },
+    "SAVE_TRAINING",
+    stats
+  );
+};
+
+export const clearQueue = (snapshot: Snapshot): Snapshot => ({
+  ...snapshot,
+  queue: []
+});
+
+export const clearExperienceData = (snapshot: Snapshot): Snapshot => ({
+  ...snapshot,
+  quoteRequests: [],
+  internshipApplications: [],
+  simulationRuns: []
+});
