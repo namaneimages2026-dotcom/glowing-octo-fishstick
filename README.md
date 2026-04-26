@@ -1,54 +1,33 @@
-# Namane Supply — Laser Manufacturing & Training Lab
+# Namane Supply OS (Local-First)
 
-Market-ready React + TypeScript web application for Namane Supply.
+Namane Supply OS is a local-first operations app for laser fabrication workflows. It is designed to run fully on a laptop first, then connect outward when needed.
 
-## What this app includes
+## Architecture (master goals implemented)
 
-- Business website for CO2 laser cutting and engraving services
-- Education hub for laser theory, safety, materials, maintenance, quoting, and workflow
-- Internship hub with operator-readiness pathway
-- Interactive Laser Lab simulation game
-- Quote system with Namane Supply pricing references
-- User dashboard and admin-style operational dashboard
+- **Local-first:** all operational state is stored in browser local storage through a snapshot store (`src/lib/store.ts`).
+- **Offline-capable:** service worker + app manifest are included (`public/sw.js`, `public/manifest.webmanifest`).
+- **QR-ready:** item labels can be generated as QR images in-app through an in-app QR-style SVG generator (`src/lib/qr.ts`).
+- **Connector-ready:** pluggable connector interface with example adapters for GitHub dispatch and ERP webhook (`src/connectors/index.ts`).
+- **GitHub deployable:** Vite static build output can be deployed to GitHub Pages or any static host.
 
-## Namane Supply focus
+## Functional modules
 
-Namane Supply is a Johannesburg-based CO2 laser cutting and engraving studio focused on non-metal fabrication.
+- Inventory management with low stock visibility.
+- Work order intake and tracking.
+- Scan station for stock movements and QR generation.
+- Offline sync queue with connector push.
 
-Supported work includes leather tags, patches, acrylic signage, MDF/wood signage, product branding, prototyping, and short-run manufacturing.
-
-Namane Supply does not offer metal cutting, fiber laser, CNC routing, or UV printing.
-
-## Run locally
+## Run local
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open the local URL shown in your terminal, usually:
-
-```text
-http://localhost:5173
-```
-
-## Production build
+## Build for deploy
 
 ```bash
 npm run build
-npm run preview
 ```
 
-## Tech stack
-
-- React
-- TypeScript
-- Vite
-- Tailwind CSS
-- Framer Motion
-- Zustand
-- Lucide React
-
-## Notes
-
-This version uses local demo data and client-side state so it can run from a laptop without requiring a backend. The code is structured so Supabase, Firebase, Airtable, or a custom backend can be added later.
+Then publish `dist/` using GitHub Pages, Netlify, Vercel, or Cloudflare Pages.
