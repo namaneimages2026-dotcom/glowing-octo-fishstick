@@ -1,22 +1,14 @@
-import { Connector } from "../types";
+import { Quote } from "../types";
 
-const fakeNetworkDelay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const comingSoon = (label: string) => `${label} — coming soon`;
 
-export const connectors: Connector[] = [
-  {
-    key: "github-dispatch",
-    label: "GitHub Actions Dispatch",
-    send: async (ops) => {
-      await fakeNetworkDelay(500);
-      return { sent: ops.length, remoteRef: `gh-${Date.now()}` };
-    }
-  },
-  {
-    key: "erp-webhook",
-    label: "ERP Webhook",
-    send: async (ops) => {
-      await fakeNetworkDelay(350);
-      return { sent: ops.length, remoteRef: `erp-${Date.now()}` };
-    }
-  }
-];
+export const integrationPlaceholders = {
+  sendQuoteEmail: async (_quote: Quote) => comingSoon("Send quote email via Gmail"),
+  sendWhatsAppReminder: async (_quote: Quote) => comingSoon("Send WhatsApp reminder"),
+  bookProductionSlot: async (_quote: Quote) => comingSoon("Book production in Google Calendar"),
+  uploadArtworkProof: async (_quote: Quote) => comingSoon("Upload artwork to Google Drive"),
+  trackDepositPayment: async (_quote: Quote) => comingSoon("Track deposit via Stripe/PayFast/EFT"),
+  createDevTask: async (_title: string) => comingSoon("Create GitHub Issue/Codex task")
+};
+
+export type IntegrationKey = keyof typeof integrationPlaceholders;
